@@ -1,8 +1,8 @@
 {% extends "base.html" %}
 
 {% block head_extra %}
-  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <script src="{{ url_for('static', filename='vendor/sortable/Sortable.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='vendor/pdfjs/pdf.min.js') }}"></script>
 <style>
   main.container{
     max-width:1600px!important;
@@ -194,7 +194,7 @@
 
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      "{{ url_for('static', filename='vendor/pdfjs/pdf.worker.min.js') }}";
   }
 
   const dropzone   = document.getElementById("dropzone");
@@ -435,7 +435,7 @@
       removeBtn.disabled = false;
       toast.error("Network error. Please try again.");
     };
-    xhr.onload = ()=>{
+    xhr.onload = async () => {
       removeBtn.disabled = false;
       const prog = document.getElementById("progress");
       if (prog) prog.classList.remove("indeterminate");
@@ -448,18 +448,22 @@
       }
 
       const blob = xhr.response;
-      const url  = URL.createObjectURL(blob);
-      downloadLink.href = url;
-
       const base = currentFile.name.replace(/\.pdf$/i, "");
       const suffix = (mode === "remove") ? "_removed" : "_selected";
-      downloadLink.setAttribute("download", `${base}${suffix}.pdf`);
+      const suggested = `${base}${suffix}.pdf`;
+
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      downloadLink.setAttribute("download", suggested);
+
+      if (window.attachDesktopSave) attachDesktopSave(downloadLink, suggested);
+
+      resultBox.classList.remove("hidden");
 
       dropzone.classList.add("hidden");
       thumbTools.classList.add("hidden");
       thumbGrid.classList.add("hidden");
       actions.classList.add("hidden");
-      resultBox.classList.remove("hidden");
 
       const mb = (blob.size/1024/1024).toFixed(2);
       document.getElementById("panelTitle").textContent = "Export ready";

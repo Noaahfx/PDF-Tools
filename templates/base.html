@@ -141,6 +141,81 @@
     })();
   </script>
 
+  <script>
+    async function downloadOrSave(blob, filename, linkEl) {
+      if (window.pywebview?.api?.save_file) {
+        const reader = new FileReader();
+        return new Promise((resolve, reject) => {
+          reader.onload = async () => {
+            try {
+              const res = await window.pywebview.api.save_file(filename, reader.result);
+              if (res?.ok) {
+                window.toast?.success?.("Saved to your chosen folder.");
+                resolve(res);
+              } else if (res?.cancelled) {
+                window.toast?.info?.("Save cancelled.");
+                resolve(res);
+              } else {
+                window.toast?.error?.(res?.error || "Save failed.");
+                reject(new Error(res?.error || "Save failed"));
+              }
+            } catch (e) {
+              window.toast?.error?.("Save failed.");
+              reject(e);
+            }
+          };
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+      }
+
+      const url = URL.createObjectURL(blob);
+      linkEl.href = url;
+      linkEl.setAttribute('download', filename);
+      return { ok: true, browser: true };
+    }
+  </script>
+
+  <script>
+  (() => {
+    async function urlToDataURL(url) {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      return await new Promise((resolve, reject) => {
+        const fr = new FileReader();
+        fr.onload = () => resolve(fr.result);
+        fr.onerror = reject;
+        fr.readAsDataURL(blob);
+      });
+    }
+
+    // Use this on any <a> that should save via PyWebview when clicked
+    window.attachDesktopSave = function(anchor, filename) {
+      if (!anchor) return;
+      anchor.addEventListener('click', async (e) => {
+        // If not running in the desktop app, let the browser handle it
+        if (!window.pywebview?.api?.save_file) return;
+
+        e.preventDefault(); // prevent navigation in the desktop app
+
+        try {
+          const href = anchor.getAttribute('href') || '';
+          const dataUrl = href.startsWith('data:')
+            ? href
+            : await urlToDataURL(href); // convert objectURL -> data URL for pywebview
+
+          const result = await window.pywebview.api.save_file(filename, dataUrl);
+          if (!result?.ok && !result?.cancelled) {
+            (window.toast?.error || alert)(result.error || 'Failed to save file.');
+          }
+        } catch (err) {
+          (window.toast?.error || alert)('Failed to save file.');
+        }
+      });
+    };
+  })();
+  </script>
+
   {% block scripts %}{% endblock %}
 
   <script>
