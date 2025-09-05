@@ -13,6 +13,9 @@ def create_app():
 
     from blueprints.merge import bp as merge_bp
     app.register_blueprint(merge_bp, url_prefix="/merge")
+
+    from blueprints.remove import bp as remove_bp
+    app.register_blueprint(remove_bp, url_prefix="/remove")
     @app.route("/")
     def home():
         return render_template("home.html")

@@ -1,0 +1,407 @@
+{% extends "base.html" %}
+
+{% block head_extra %}
+  <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+  main.container{
+    max-width:1600px!important;
+    padding-left:32px!important;
+    padding-right:32px!important;
+  }
+
+  .visually-hidden{
+    position:absolute!important; width:1px; height:1px; padding:0; margin:-1px;
+    overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+  }
+
+  .thumb-grid{
+    margin-top:16px;
+    display:grid;
+    gap:14px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  @media (min-width:900px){
+    .thumb-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  }
+  @media (min-width:1300px){
+    .thumb-grid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  }
+
+  .page-card{
+    position:relative;
+    background:#0b1118;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:6px;
+    cursor:pointer;
+    transition:transform .12s, border-color .12s, box-shadow .12s;
+  }
+  .page-card:hover{ transform:translateY(-2px); box-shadow:var(--shadow); }
+  .page-card.selected{ border-color: var(--primary); }
+  .page-card canvas{ width:100% !important; height:auto !important; border-radius:10px; display:block; }
+  .page-num{
+    position:absolute; top:8px; left:8px;
+    padding:3px 9px; font-size:12px; border-radius:999px;
+    background:rgba(0,0,0,.6); border:1px solid var(--border);
+  }
+
+  .thumb-tools{
+    position:sticky; top:72px; z-index:5;
+    background:rgba(14,20,27,.7);
+    backdrop-filter:blur(6px);
+    border-radius:12px;
+    padding:8px 10px; margin-top:14px;
+    display:flex; align-items:center; justify-content:space-between;
+    gap:12px; flex-wrap:wrap;
+  }
+  .thumb-tools .left,
+  .thumb-tools .right{
+    display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+  }
+
+  #countHint{
+    white-space:nowrap; margin-left:10px;
+    padding:6px 10px; border:1px solid var(--border);
+    border-radius:999px; background:#0e141b; color:var(--muted);
+    font-size:12px; font-weight:600;
+  }
+
+  .seg{
+    display:inline-flex;
+    border:1px solid var(--border);
+    border-radius:12px;
+    overflow:hidden;
+    background:#0e141b;
+  }
+  .seg button{
+    padding:8px 12px; border:0; background:transparent;
+    color:var(--muted); font-weight:600; cursor:pointer;
+  }
+  .seg button.active{ background:#0e141b; color:var(--text); }
+  .seg button + button{ border-left:1px solid rgba(255,255,255,0.15); }
+
+  .panel .btn{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+  .panel .btn.small{ padding:8px 12px; border-radius:10px; }
+
+  .btn.danger{ background: var(--danger); border-color: transparent; color:#1b1f24; }
+  .btn.danger:hover{ background: var(--danger-700); }
+</style>
+{% endblock %}
+
+{% block content %}
+<section class="panel">
+  <h2 id="panelTitle">Remove Pages</h2>
+  <p id="panelSubtitle" class="muted">Open a PDF, select the pages to remove (or switch to “Keep”), then export.</p>
+
+  <div id="dropzone" class="dropzone" aria-label="Add PDF">
+    <input type="file" id="fileInput" accept="application/pdf" class="visually-hidden">
+    <div class="dz-content">
+      <label for="fileInput" class="btn primary">Choose PDF</label>
+      <p class="hint">or drag & drop your file here</p>
+      <p id="fileMeta" class="file-meta"></p>
+    </div>
+  </div>
+
+  <div id="thumbTools" class="thumb-tools hidden">
+    <div class="left">
+      <div class="seg" role="tablist" aria-label="Selection mode">
+        <button type="button" id="modeRemove" class="active" aria-selected="true">Select to remove</button>
+        <button type="button" id="modeKeep">Select to keep</button>
+      </div>
+      <span style="margin-left:10px" class="file-meta" id="countHint"></span>
+    </div>
+    <div class="right">
+      <button id="selectAll"  class="btn outline-primary small">Select all</button>
+      <button id="selectNone" class="btn outline-muted small">Clear selection</button>
+      <button id="clearFile"  class="btn danger small">Remove file</button>
+    </div>
+  </div>
+
+  <div id="thumbGrid" class="thumb-grid hidden" aria-live="polite"></div>
+
+  <div id="actions" class="actions hidden">
+    <button id="removeBtn" class="btn primary">Remove pages</button>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+  </div>
+
+  <div id="result" class="result hidden">
+    <a id="downloadLink" class="btn success equal" download>Download PDF</a>
+    <button id="startOver" class="btn ghost equal">Remove pages from another PDF</button>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+  }
+
+  const dropzone   = document.getElementById("dropzone");
+  const fileInput  = document.getElementById("fileInput");
+  const fileMeta   = document.getElementById("fileMeta");
+  const thumbGrid  = document.getElementById("thumbGrid");
+  const thumbTools = document.getElementById("thumbTools");
+  const selectAllBtn = document.getElementById("selectAll");
+  const selectNoneBtn= document.getElementById("selectNone");
+  const clearFileBtn = document.getElementById("clearFile");
+  const removeBtn  = document.getElementById("removeBtn");
+  const actions    = document.getElementById("actions");
+  const statusEl   = document.getElementById("status");
+  const resultBox  = document.getElementById("result");
+  const downloadLink = document.getElementById("downloadLink");
+  const startOverBtn  = document.getElementById("startOver");
+  const countHint  = document.getElementById("countHint");
+  const modeRemoveBtn = document.getElementById("modeRemove");
+  const modeKeepBtn   = document.getElementById("modeKeep");
+
+  const DPR = Math.max(1.5, window.devicePixelRatio || 1);
+  const THUMB_SCALE = matchMedia("(min-width:1300px)").matches ? 0.40 : 0.34;
+  let currentFile = null;
+  let pdfDoc = null;
+  let mode = "remove";
+
+  function resetUI(){
+    fileInput.value = "";
+    currentFile = null;
+    pdfDoc = null;
+
+    dropzone.classList.remove("hidden");
+    dropzone.classList.remove("dragover");
+    thumbTools.classList.add("hidden");
+    thumbGrid.innerHTML = "";
+    thumbGrid.classList.add("hidden");
+    actions.classList.add("hidden");
+    fileMeta.textContent = "";
+    countHint.textContent = "";
+
+    if (downloadLink.href) URL.revokeObjectURL(downloadLink.href);
+    downloadLink.removeAttribute("href");
+    resultBox.classList.add("hidden");
+
+    statusEl.textContent = "";
+    const prog = document.querySelector(".progress");
+    if (prog) prog.remove();
+
+    document.getElementById("panelTitle").textContent = "Remove Pages";
+    document.getElementById("panelSubtitle").textContent =
+      "Open a PDF, select the pages to remove (or switch to “Keep”), then export.";
+    document.querySelector(".panel").classList.remove("center");
+
+    mode = "remove";
+    modeRemoveBtn.classList.add("active");
+    modeKeepBtn.classList.remove("active");
+    removeBtn.textContent = "Remove pages";
+  }
+
+  fileInput.addEventListener("change", (e)=>{
+    const f = e.target.files?.[0];
+    if (f) handleFile(f);
+    e.target.value = "";
+  });
+  ["dragenter","dragover"].forEach(evt=>{
+    dropzone.addEventListener(evt,(e)=>{ e.preventDefault(); e.stopPropagation(); dropzone.classList.add("dragover"); });
+  });
+  ["dragleave","drop"].forEach(evt=>{
+    dropzone.addEventListener(evt,(e)=>{ e.preventDefault(); e.stopPropagation(); dropzone.className="dropzone"; });
+  });
+  dropzone.addEventListener("drop",(e)=>{
+    const f = Array.from(e.dataTransfer.files||[]).find(x=>x.type==="application/pdf"||/\.pdf$/i.test(x.name));
+    if (f) handleFile(f);
+  });
+
+  clearFileBtn.addEventListener("click", resetUI);
+  selectAllBtn.addEventListener("click", ()=> {
+    document.querySelectorAll(".page-card").forEach(c=>c.classList.add("selected"));
+    updateCount();
+  });
+  selectNoneBtn.addEventListener("click", ()=> {
+    document.querySelectorAll(".page-card").forEach(c=>c.classList.remove("selected"));
+    updateCount();
+  });
+
+  modeRemoveBtn.addEventListener("click", ()=>{
+    mode = "remove";
+    modeRemoveBtn.classList.add("active");
+    modeKeepBtn.classList.remove("active");
+    removeBtn.textContent = "Remove pages";
+    updateCount();
+  });
+  modeKeepBtn.addEventListener("click", ()=>{
+    mode = "keep";
+    modeKeepBtn.classList.add("active");
+    modeRemoveBtn.classList.remove("active");
+    removeBtn.textContent = "Export selected pages";
+    updateCount();
+  });
+
+  function updateCount(){
+    const total = pdfDoc ? pdfDoc.numPages : 0;
+    const selected = document.querySelectorAll(".page-card.selected").length;
+    const verb = mode === "remove" ? "to remove" : "to keep";
+    countHint.textContent = `${selected}/${total} ${verb}`;
+  }
+
+  async function handleFile(file){
+    if (!file || !(file.type==="application/pdf" || /\.pdf$/i.test(file.name))) {
+      alert("Please choose a PDF file."); return;
+    }
+    resetUI();
+    currentFile = file;
+    fileMeta.textContent = `${file.name} • ${(file.size/1024/1024).toFixed(2)} MB`;
+
+    const buf = await file.arrayBuffer();
+    pdfDoc = await pdfjsLib.getDocument({ data: buf }).promise;
+
+    thumbGrid.classList.remove("hidden");
+    thumbTools.classList.remove("hidden");
+    actions.classList.remove("hidden");
+
+    for (let i=1;i<=pdfDoc.numPages;i++){
+      const page = await pdfDoc.getPage(i);
+
+
+      const viewportCSS = page.getViewport({ scale: THUMB_SCALE });
+
+      const viewport = page.getViewport({ scale: THUMB_SCALE * DPR });
+
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+
+      canvas.width  = Math.floor(viewport.width);
+      canvas.height = Math.floor(viewport.height);
+
+      canvas.style.width  = Math.floor(viewportCSS.width) + "px";
+      canvas.style.height = Math.floor(viewportCSS.height) + "px";
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      const card = document.createElement("div");
+      card.className = "page-card";
+      card.setAttribute("data-index", (i-1));
+      card.appendChild(canvas);
+
+      const num = document.createElement("div");
+      num.className = "page-num";
+      num.textContent = i;
+      card.appendChild(num);
+
+      card.addEventListener("click", (ev)=>{
+        if (!ev.target.classList.contains("page-num")){
+          card.classList.toggle("selected");
+          updateCount();
+        }
+      });
+
+      thumbGrid.appendChild(card);
+    }
+
+    updateCount();
+  }
+
+  removeBtn.addEventListener("click", ()=>{
+    if (!currentFile) return;
+
+    const cards = Array.from(document.querySelectorAll(".page-card"));
+    const selected = cards.filter(c=>c.classList.contains("selected")).map(c=>parseInt(c.getAttribute("data-index"),10));
+
+    if (mode === "remove" && selected.length === 0) {
+      alert("Select at least one page to remove.");
+      return;
+    }
+    if (mode === "keep" && selected.length === 0) {
+      alert("Select at least one page to keep.");
+      return;
+    }
+
+    let removeList = selected;
+    if (mode === "keep") {
+      const total = cards.length;
+      const keepSet = new Set(selected);
+      removeList = [];
+      for (let i=0;i<total;i++){ if (!keepSet.has(i)) removeList.push(i); }
+    }
+
+    statusEl.innerHTML = `
+      <span class="spinner"></span>
+      <span id="statusText">Uploading…</span>
+      <span class="progress" id="progress"><span class="bar" id="progressBar"></span></span>
+      <span id="pct">0%</span>
+    `;
+    removeBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append("file", currentFile);
+    fd.append("remove", JSON.stringify(removeList));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "{{ url_for('remove.api_remove') }}");
+    xhr.responseType = "blob";
+
+    xhr.upload.onprogress = (e)=>{
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded/e.total)*100);
+      const bar = document.getElementById("progressBar");
+      const pctEl = document.getElementById("pct");
+      if (bar) bar.style.width = pct + "%";
+      if (pctEl) pctEl.textContent = pct + "%";
+    };
+    xhr.upload.onloadend = ()=>{
+      const txt = document.getElementById("statusText");
+      const prog = document.getElementById("progress");
+      const pct = document.getElementById("pct");
+      if (txt) txt.textContent = "Processing…";
+      if (pct) pct.textContent = "100% (upload)";
+      if (prog) prog.classList.add("indeterminate");
+    };
+    xhr.onerror = ()=>{
+      removeBtn.disabled = false;
+      alert("Network error.");
+    };
+    xhr.onload = ()=>{
+      removeBtn.disabled = false;
+      const prog = document.getElementById("progress");
+      if (prog) prog.classList.remove("indeterminate");
+
+      if (xhr.status !== 200){
+        const r = new FileReader();
+        r.onload = ()=> alert(r.result || "Failed to export PDF");
+        r.readAsText(xhr.response);
+        return;
+      }
+
+      const blob = xhr.response;
+      const url  = URL.createObjectURL(blob);
+      downloadLink.href = url;
+
+      const base = currentFile.name.replace(/\.pdf$/i, "");
+      const suffix = (mode === "remove") ? "_removed" : "_selected";
+      downloadLink.setAttribute("download", `${base}${suffix}.pdf`);
+
+      dropzone.classList.add("hidden");
+      thumbTools.classList.add("hidden");
+      thumbGrid.classList.add("hidden");
+      actions.classList.add("hidden");
+      resultBox.classList.remove("hidden");
+
+      const mb = (blob.size/1024/1024).toFixed(2);
+      document.getElementById("panelTitle").textContent = "Export ready";
+      document.getElementById("panelSubtitle").textContent =
+        `Your PDF is ready (${mb} MB). Click Download to save it.`;
+
+      document.querySelector(".panel").classList.add("center");
+      statusEl.textContent = "";
+      resultBox.scrollIntoView({ behavior:"smooth", block:"start" });
+    };
+
+    xhr.send(fd);
+  });
+
+  startOverBtn.addEventListener("click", ()=>{
+    resetUI();
+    dropzone.scrollIntoView({ behavior:"smooth", block:"start" });
+  });
+</script>
+{% endblock %}

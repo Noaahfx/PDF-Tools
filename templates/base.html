@@ -21,7 +21,7 @@
       <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
       <a href="{{ url_for('convert.convert_page') }}" class="nav-link {% if request.endpoint == 'convert.convert_page' %}active{% endif %}">Convert</a>
       <a href="{{ url_for('merge.merge_page') }}" class="nav-link {% if request.endpoint == 'merge.merge_page' %}active{% endif %}">Merge</a>
-      <span class="nav-link disabled" title="Coming soon">Remove Pages</span>
+      <a href="{{ url_for('remove.remove_page') }}" class="nav-link {% if request.endpoint == 'remove.remove_page' %}active{% endif %}">Remove Pages</a>
     </nav>
   </header>
 

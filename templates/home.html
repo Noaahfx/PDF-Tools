@@ -45,7 +45,7 @@
       <span class="cta">Open →</span>
     </a>
 
-    <div class="tool-card disabled" aria-disabled="true">
+    <a href="{{ url_for('remove.remove_page') }}" class="tool-card" aria-label="Open Remove Pages">
       <div class="icon-wrap icon-remove" aria-hidden="true">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
           <path d="M5 4h6.5l4.5 4.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
@@ -59,9 +59,9 @@
         </svg>
       </div>
       <h3>Remove Pages</h3>
-      <p>Pick and remove specific pages from a PDF, export the rest.</p>
-      <span class="chip">Coming soon</span>
-    </div>
+      <p>Pick pages to remove (or keep), then export the rest.</p>
+      <span class="cta">Open →</span>
+    </a>
   </div>
 </section>
 
