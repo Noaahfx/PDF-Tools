@@ -11,6 +11,8 @@ def create_app():
     from blueprints.convert import bp as convert_bp
     app.register_blueprint(convert_bp, url_prefix="/convert")
 
+    from blueprints.merge import bp as merge_bp
+    app.register_blueprint(merge_bp, url_prefix="/merge")
     @app.route("/")
     def home():
         return render_template("home.html")

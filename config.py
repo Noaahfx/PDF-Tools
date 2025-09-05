@@ -5,3 +5,4 @@ class Config:
     MAX_UPLOAD_MB = int(os.environ.get("MAX_UPLOAD_MB", 50))
     MAX_CONTENT_LENGTH = MAX_UPLOAD_MB * 1024 * 1024
     ALLOWED_EXTENSIONS = {".pdf"}
+    MERGE_MAX_FILES = int(os.environ.get("MERGE_MAX_FILES", 10))
