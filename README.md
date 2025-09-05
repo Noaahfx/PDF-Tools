@@ -64,7 +64,7 @@ No python required on the target machine to use the .exe file.
 
 ## Config
 
-Edit `config.py` (or env vars) to tweak limits:
+Edit `config.py` to tweak limits:
 
 * `MAX_UPLOAD_MB` — default **50**
 * Allowed extensions are `[".pdf"]`
