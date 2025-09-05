@@ -3,6 +3,62 @@
 {% block head_extra %}
   <script src="https://cdn.jsdelivr.net/npm/sortablejs@1.15.2/Sortable.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <style>
+    main.container{
+      max-width:1600px!important;
+      padding-left:32px!important;
+      padding-right:32px!important;
+    }
+    .visually-hidden{
+      position:absolute!important; width:1px; height:1px; padding:0; margin:-1px;
+      overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;
+    }
+
+    .thumb-grid{
+      margin-top:16px;
+      display:grid;
+      gap:14px;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+    @media (min-width:900px){
+      .thumb-grid{ grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    }
+    @media (min-width:1300px){
+      .thumb-grid{ grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    }
+
+    .page-card{
+      position:relative;
+      background:#0b1118;
+      border:1px solid var(--border);
+      border-radius:16px;
+      padding:6px;
+      cursor:pointer;
+      transition:transform .12s, border-color .12s, box-shadow .12s;
+    }
+    .page-card:hover{ transform:translateY(-2px); box-shadow:var(--shadow); }
+    .page-card.selected{ border-color: var(--primary); }
+    .page-card canvas{ width:100%!important; height:auto!important; border-radius:10px; display:block; }
+    .page-num{
+      position:absolute; top:8px; left:8px;
+      padding:3px 9px; font-size:12px; border-radius:999px;
+      background:rgba(0,0,0,.6); border:1px solid var(--border);
+    }
+
+    .thumb-tools{
+      position:sticky; top:72px; z-index:5;
+      background:rgba(14,20,27,.7); backdrop-filter:blur(6px);
+      border-radius:12px; padding:8px 10px; margin-top:14px;
+      display:flex; align-items:center; justify-content:space-between;
+      gap:12px; flex-wrap:wrap;
+    }
+    .thumb-tools .left, .thumb-tools .right{
+      display:flex; align-items:center; gap:10px; flex-wrap:wrap;
+    }
+
+    .panel .btn{ display:inline-flex; align-items:center; justify-content:center; line-height:1; }
+    .panel .btn.small{ padding:8px 12px; border-radius:10px; }
+  </style>
 {% endblock %}
 
 {% block content %}
@@ -13,9 +69,9 @@
   </p>
 
   <div id="dropzone" class="dropzone">
-    <input type="file" id="fileInput" accept="application/pdf" hidden>
+    <input type="file" id="fileInput" accept="application/pdf" class="visually-hidden">
     <div class="dz-content">
-      <button id="chooseBtn" class="btn primary">Choose PDF</button>
+      <label for="fileInput" id="chooseBtn" class="btn primary">Choose PDF</label>
       <p class="hint">or drag & drop your file here</p>
       <p id="fileMeta" class="file-meta"></p>
     </div>
@@ -48,28 +104,31 @@
 {% block scripts %}
 <script>
   if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 
-  const dropzone = document.getElementById("dropzone");
-  const fileInput = document.getElementById("fileInput");
-  const chooseBtn = document.getElementById("chooseBtn");
-  const fileMeta = document.getElementById("fileMeta");
-  const thumbGrid = document.getElementById("thumbGrid");
-  const thumbTools = document.getElementById("thumbTools");
-  const selectAllBtn = document.getElementById("selectAll");
-  const selectNoneBtn = document.getElementById("selectNone");
-  const clearFileBtn = document.getElementById("clearFile");
-  const convertBtn = document.getElementById("convertBtn");
-  const statusEl = document.getElementById("status");
-  const actions = document.getElementById("actions");
-  const resultBox = document.getElementById("result");
-  const downloadLink = document.getElementById("downloadLink");
-  const startOverBtn = document.getElementById("startOver");
+  const dropzone    = document.getElementById("dropzone");
+  const fileInput   = document.getElementById("fileInput");
+  const fileMeta    = document.getElementById("fileMeta");
+  const thumbGrid   = document.getElementById("thumbGrid");
+  const thumbTools  = document.getElementById("thumbTools");
+  const selectAllBtn= document.getElementById("selectAll");
+  const selectNoneBtn=document.getElementById("selectNone");
+  const clearFileBtn= document.getElementById("clearFile");
+  const convertBtn  = document.getElementById("convertBtn");
+  const statusEl    = document.getElementById("status");
+  const actions     = document.getElementById("actions");
+  const resultBox   = document.getElementById("result");
+  const downloadLink= document.getElementById("downloadLink");
+  const startOverBtn= document.getElementById("startOver");
 
   let currentFile = null;
   let pdfDoc = null;
   let sortable = null;
+
+  const DPR = Math.max(1.5, window.devicePixelRatio || 1);
+  const THUMB_SCALE = matchMedia("(min-width:1300px)").matches ? 0.40 : 0.34;
 
   function resetUI() {
     fileInput.value = "";
@@ -100,26 +159,21 @@
     document.querySelector(".panel").classList.remove("center");
   }
 
-  chooseBtn.addEventListener("click", () => fileInput.click());
   fileInput.addEventListener("change", (e) => {
-    if (e.target.files && e.target.files[0]) {
-      handleFile(e.target.files[0]);
-    }
+    if (e.target.files && e.target.files[0]) handleFile(e.target.files[0]);
+    e.target.value = "";
   });
 
   ["dragenter", "dragover"].forEach(evt => {
     dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+      e.preventDefault(); e.stopPropagation();
       dropzone.classList.add("dragover");
     });
   });
   ["dragleave", "drop"].forEach(evt => {
     dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropzone.removeAttribute("class");
-      dropzone.classList.add("dropzone");
+      e.preventDefault(); e.stopPropagation();
+      dropzone.removeAttribute("class"); dropzone.classList.add("dropzone");
     });
   });
   dropzone.addEventListener("drop", (e) => {
@@ -127,10 +181,7 @@
     if (file) handleFile(file);
   });
 
-  clearFileBtn.addEventListener("click", () => {
-    fileInput.value = "";
-    resetUI();
-  });
+  clearFileBtn.addEventListener("click", resetUI);
 
   selectAllBtn.addEventListener("click", () => {
     document.querySelectorAll(".page-card").forEach(card => card.classList.add("selected"));
@@ -145,7 +196,7 @@
   });
 
   async function handleFile(file) {
-    if (!file || file.type !== "application/pdf") {
+    if (!file || (file.type !== "application/pdf" && !/\.pdf$/i.test(file.name))) {
       alert("Please choose a PDF file.");
       return;
     }
@@ -162,11 +213,17 @@
 
     for (let i = 1; i <= pdfDoc.numPages; i++) {
       const page = await pdfDoc.getPage(i);
-      const viewport = page.getViewport({ scale: 0.2 });
+
+      const viewportCSS = page.getViewport({ scale: THUMB_SCALE });
+      const viewport = page.getViewport({ scale: THUMB_SCALE * DPR });
+
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
-      canvas.width = Math.floor(viewport.width);
+      canvas.width  = Math.floor(viewport.width);
       canvas.height = Math.floor(viewport.height);
+      canvas.style.width  = Math.floor(viewportCSS.width) + "px";
+      canvas.style.height = Math.floor(viewportCSS.height) + "px";
+
       await page.render({ canvasContext: ctx, viewport }).promise;
 
       const card = document.createElement("div");
@@ -197,96 +254,94 @@
     });
   }
 
-    convertBtn.addEventListener("click", () => {
-      if (!currentFile) return;
+  convertBtn.addEventListener("click", () => {
+    if (!currentFile) return;
 
-      const cards = Array.from(document.querySelectorAll(".page-card"));
-      const selected = cards.filter(c => c.classList.contains("selected"));
-      if (selected.length === 0) {
-        alert("Please select at least one page to convert.");
+    const cards = Array.from(document.querySelectorAll(".page-card"));
+    const selected = cards.filter(c => c.classList.contains("selected"));
+    if (selected.length === 0) {
+      alert("Please select at least one page to convert.");
+      return;
+    }
+    const order = selected.map(c => parseInt(c.getAttribute("data-index"), 10));
+
+    statusEl.innerHTML = `
+      <span class="spinner" id="spinner"></span>
+      <span id="statusText">Uploading…</span>
+      <span class="progress" id="progress"><span class="bar" id="progressBar"></span></span>
+      <span id="pct">0%</span>
+    `;
+    convertBtn.disabled = true;
+
+    const fd = new FormData();
+    fd.append("file", currentFile);
+    fd.append("order", JSON.stringify(order));
+
+    const xhr = new XMLHttpRequest();
+    xhr.open("POST", "{{ url_for('convert.api_convert') }}");
+    xhr.responseType = "blob";
+
+    xhr.upload.onprogress = (e) => {
+      if (!e.lengthComputable) return;
+      const pct = Math.round((e.loaded / e.total) * 100);
+      const bar = document.getElementById("progressBar");
+      const pctEl = document.getElementById("pct");
+      if (bar) bar.style.width = pct + "%";
+      if (pctEl) pctEl.textContent = pct + "%";
+    };
+
+    xhr.upload.onloadend = () => {
+      const txt  = document.getElementById("statusText");
+      const pct  = document.getElementById("pct");
+      const prog = document.getElementById("progress");
+      if (txt) txt.textContent = "Converting…";
+      if (pct) pct.textContent = "100%";
+      if (prog) prog.classList.add("indeterminate");
+    };
+
+    xhr.onerror = () => {
+      convertBtn.disabled = false;
+      const txt = document.getElementById("statusText");
+      if (txt) txt.textContent = "Network error.";
+    };
+
+    xhr.onload = () => {
+      convertBtn.disabled = false;
+      const prog = document.getElementById("progress");
+      if (prog) prog.classList.remove("indeterminate");
+
+      if (xhr.status !== 200) {
+        const reader = new FileReader();
+        reader.onload = () => alert(reader.result || "Conversion failed");
+        reader.readAsText(xhr.response);
         return;
       }
-      const order = selected.map(c => parseInt(c.getAttribute("data-index"), 10));
 
-      statusEl.innerHTML = `
-        <span class="spinner" id="spinner"></span>
-        <span id="statusText">Uploading…</span>
-        <span class="progress" id="progress"><span class="bar" id="progressBar"></span></span>
-        <span id="pct">0%</span>
-      `;
-      convertBtn.disabled = true;
+      const blob = xhr.response;
+      const url = URL.createObjectURL(blob);
+      downloadLink.href = url;
+      const suggested = (currentFile.name.replace(/\.pdf$/i, "")) + "_converted.docx";
+      downloadLink.setAttribute("download", suggested);
 
-      const fd = new FormData();
-      fd.append("file", currentFile);
-      fd.append("order", JSON.stringify(order));
+      dropzone.classList.add("hidden");
+      thumbTools.classList.add("hidden");
+      thumbGrid.classList.add("hidden");
+      actions.classList.add("hidden");
 
-      const xhr = new XMLHttpRequest();
-      xhr.open("POST", "{{ url_for('convert.api_convert') }}");
-      xhr.responseType = "blob";
+      resultBox.classList.remove("hidden");
+      document.getElementById("panelTitle").textContent = "Conversion complete";
+      const mb = (blob.size / 1024 / 1024).toFixed(2);
+      document.getElementById("panelSubtitle").textContent =
+        `Your DOCX is ready (${mb} MB). Click Download to save it.`;
 
-      xhr.upload.onprogress = (e) => {
-        if (!e.lengthComputable) return;
-        const pct = Math.round((e.loaded / e.total) * 100);
-        const bar = document.getElementById("progressBar");
-        const pctEl = document.getElementById("pct");
-        if (bar) bar.style.width = pct + "%";
-        if (pctEl) pctEl.textContent = pct + "%";
-      };
+      document.querySelector(".panel").classList.add("center");
+      resultBox.classList.add("center");
+      startOverBtn.textContent = "Convert another PDF";
+      statusEl.textContent = "";
+      resultBox.scrollIntoView({ behavior: "smooth", block: "start" });
+    };
 
-      xhr.upload.onloadend = () => {
-        const txt  = document.getElementById("statusText");
-        const pct  = document.getElementById("pct");
-        const prog = document.getElementById("progress");
-
-        if (txt) txt.textContent = "Converting…";
-        if (pct) pct.textContent = "100%";
-        if (prog) prog.classList.add("indeterminate");
-      };
-
-      xhr.onerror = () => {
-        convertBtn.disabled = false;
-        const txt = document.getElementById("statusText");
-        if (txt) txt.textContent = "Network error.";
-      };
-
-      xhr.onload = () => {
-        convertBtn.disabled = false;
-
-        const prog = document.getElementById("progress");
-        if (prog) prog.classList.remove("indeterminate");
-
-        if (xhr.status !== 200) {
-          const reader = new FileReader();
-          reader.onload = () => alert(reader.result || "Conversion failed");
-          reader.readAsText(xhr.response);
-          return;
-        }
-
-        const blob = xhr.response;
-        const url = URL.createObjectURL(blob);
-        downloadLink.href = url;
-        const suggested = (currentFile.name.replace(/\.pdf$/i, "")) + "_converted.docx";
-        downloadLink.setAttribute("download", suggested);
-
-        dropzone.classList.add("hidden");
-        thumbTools.classList.add("hidden");
-        thumbGrid.classList.add("hidden");
-        actions.classList.add("hidden");
-
-        resultBox.classList.remove("hidden");
-        document.getElementById("panelTitle").textContent = "Conversion complete";
-        const mb = (blob.size / 1024 / 1024).toFixed(2);
-        document.getElementById("panelSubtitle").textContent =
-          `Your DOCX is ready (${mb} MB). Click Download to save it.`;
-
-        document.querySelector(".panel").classList.add("center");
-        resultBox.classList.add("center");
-        startOverBtn.textContent = "Convert another PDF";
-        statusEl.textContent = "";
-        resultBox.scrollIntoView({ behavior: "smooth", block: "start" });
-      };
-
-      xhr.send(fd);
+    xhr.send(fd);
   });
 </script>
 {% endblock %}
