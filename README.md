@@ -29,7 +29,7 @@ Open: [http://127.0.0.1:8000](http://127.0.0.1:8000)
 
 ---
 
-## Quick Start (Desktop App – Dev)
+## Quick Start (Desktop App)
 
 ```powershell
 # venv should be active and requirements installed
