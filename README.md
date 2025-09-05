@@ -57,7 +57,8 @@ pyinstaller `
 ```
 
 Output: `dist\PDF Tools.exe`
-Share that file, no Python required on the target machine.
+
+No python required on the target machine to use the .exe file.
 
 ---
 
