@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="hero">
+  <h1>Welcome to <span class="pdf">PDF</span> <span class="tools">Tools</span></h1>
+  <p class="sub">Beautiful, fast, and user-friendly PDF utilities.</p>
+</section>
+
+<section class="tools">
+  <div class="tools-grid">
+    <a href="{{ url_for('convert.convert_page') }}" class="tool-card" aria-label="Open Convert PDF to Word">
+      <div class="icon-wrap icon-convert" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <path d="M5 4h7l4 4v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+                stroke="currentColor" stroke-width="1.7" fill="none"/>
+          <path d="M12 4v4h4" stroke="currentColor" stroke-width="1.2"/>
+
+          <path d="M7 11h5M7 14h5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+
+          <path d="M18.5 12h3" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/>
+          <path d="M21.5 10.5L23 12l-1.5 1.5"
+                stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      <h3>Convert to Word</h3>
+      <p>Turn PDF pages into an editable DOCX while keeping the layout.</p>
+      <span class="cta">Open →</span>
+    </a>
+
+    <div class="tool-card disabled" aria-disabled="true">
+      <div class="icon-wrap icon-merge" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="6" width="8" height="12" rx="2"
+                stroke="currentColor" stroke-width="1.7" fill="none"/>
+          <path d="M6 10h4M6 13h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+
+          <path d="M11 4h5l3 3V18a2 2 0 0 1-2 2h-6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+                stroke="currentColor" stroke-width="1.7" fill="none"/>
+          <path d="M16 4v3h3" stroke="currentColor" stroke-width="1.2"/>
+          <path d="M13 11h4M13 14h4" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+        </svg>
+      </div>
+      <h3>Merge PDFs</h3>
+      <p>Combine multiple PDFs, reorder via thumbnails, export one file.</p>
+      <span class="chip">Coming soon</span>
+    </div>
+
+    <div class="tool-card disabled" aria-disabled="true">
+      <div class="icon-wrap icon-remove" aria-hidden="true">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none">
+          <path d="M5 4h6.5l4.5 4.5V19a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"
+                stroke="currentColor" stroke-width="1.7" fill="none"/>
+          <path d="M11.5 4v4.5h4.5" stroke="currentColor" stroke-width="1.2"/>
+
+          <path d="M7 11h6M7 14h6" stroke="currentColor" stroke-width="1.2"/>
+
+          <circle cx="19.5" cy="4.5" r="3" stroke="currentColor" stroke-width="1.7" fill="none"/>
+          <path d="M18 4.5h3" stroke="currentColor" stroke-width="1.2"/>
+        </svg>
+      </div>
+      <h3>Remove Pages</h3>
+      <p>Pick and remove specific pages from a PDF, export the rest.</p>
+      <span class="chip">Coming soon</span>
+    </div>
+  </div>
+</section>
+
+{% endblock %}

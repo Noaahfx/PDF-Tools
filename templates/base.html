@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PDF Tools</title>
+
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="icon" href="{{ url_for('static', filename='img/logo.svg') }}" type="image/svg+xml">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+  {% block head_extra %}{% endblock %}
+</head>
+<body>
+  <header class="app-header">
+    <a href="{{ url_for('home') }}" class="brand" aria-label="PDF Tools — Home">
+      <img src="{{ url_for('static', filename='img/logo.svg') }}" class="logo" alt="PDF Tools logo">
+      <span class="brand-text"><span class="pdf">PDF</span> <span class="tools">Tools</span></span>
+    </a>
+    <nav class="nav">
+      <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
+      <a href="{{ url_for('convert.convert_page') }}" class="nav-link {% if request.endpoint == 'convert.convert_page' %}active{% endif %}">Convert</a>
+      <span class="nav-link disabled" title="Coming soon">Merge</span>
+      <span class="nav-link disabled" title="Coming soon">Remove Pages</span>
+    </nav>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="app-footer">
+    <div class="footer-chip">
+      © 2025 PDF Tools — Built with Flask
+    </div>
+  </footer>
+
+  {% block scripts %}{% endblock %}
+</body>
+</html>
