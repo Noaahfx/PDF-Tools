@@ -25,7 +25,7 @@
     grid-template-columns: 1fr;
   }
 
-  @media (min-width:380px){
+  @media (min-width:420px){
     .thumb-grid{ grid-template-columns: repeat(2, minmax(0,1fr)); }
   }
 
@@ -35,6 +35,15 @@
 
   @media (min-width:1200px){
     .thumb-grid{ grid-template-columns: repeat(4, minmax(0,1fr)); }
+  }
+  .page-card{
+    position: relative;
+    background:#0b1118;
+    border:1px solid var(--border);
+    border-radius:16px;
+    padding:6px;
+    overflow:hidden;   /* clips canvas edges cleanly */
+    transition:transform .12s, border-color .12s, box-shadow .12s;
   }
 
   .page-card canvas{
@@ -74,7 +83,8 @@
 
   @media (max-width:540px){
     .thumb-tools{
-      position: static;
+      position: sticky;
+      flex-direction: column;
       top:auto;
       display:grid;
       grid-template-columns: 1fr;
@@ -82,7 +92,13 @@
       padding:10px;
     }
     .thumb-tools .left,
-    .thumb-tools .right{ justify-content:flex-start; gap:8px; flex-wrap:wrap; }
+    .thumb-tools .right{
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-start;
+      width: 100%;
+    }
     .seg{ width:100%; }
     .seg button{ padding:8px 10px; }
   }
@@ -169,11 +185,11 @@
     function setTop(){
       const h = Math.round(header.getBoundingClientRect().height || 72);
       tools.style.top = (h + 8) + 'px';
+      document.documentElement.style.setProperty('--tools-top', (h + 8) + 'px');
     }
     setTop();
     window.addEventListener('resize', setTop);
-    const obs = new MutationObserver(setTop);
-    obs.observe(document.body, { attributes:true, attributeFilter:['class'] });
+    new ResizeObserver(setTop).observe(header);
   })();
 
   if (window.pdfjsLib) {
@@ -202,8 +218,8 @@
   const DPR = Math.max(1.5, window.devicePixelRatio || 1);
 
   function getCssScale(){
-    if (window.matchMedia("(max-width:380px)").matches) return 0.20;
-    if (window.matchMedia("(max-width:540px)").matches) return 0.22;
+    if (window.matchMedia("(max-width:420px)").matches) return 0.20;
+    if (window.matchMedia("(max-width:540px)").matches) return 0.24;
     if (window.matchMedia("(max-width:900px)").matches)  return 0.30;
     if (window.matchMedia("(min-width:1200px)").matches) return 0.42;
     return 0.36;

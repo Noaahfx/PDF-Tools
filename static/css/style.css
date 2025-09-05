@@ -434,3 +434,13 @@ main.container{ max-width: 1600px; padding-left: 32px; padding-right: 32px; }
 
   body.menu-open{ overflow:hidden; }
 }
+
+.app-header{
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--border);
+}
+
+main.container{ padding-top: calc( var(--header-h, 64px) + 8px ); }
