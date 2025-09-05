@@ -96,24 +96,25 @@
       const r=(Math.random()*16)|0, v=c==='x'?r:(r&0x3|0x8); return v.toString(16);
     });
   }
+
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
   }
 
   const MAX_FILES = {{ MAX_FILES|int }};
-  const dropzone   = document.getElementById("dropzone");
-  const fileInput  = document.getElementById("fileInput");
-  const clearAllBtn= document.getElementById("clearAllBtn");
-  const countBadge = document.getElementById("countBadge");
-  const toolbar    = document.getElementById("toolbar");
-  const fileGrid   = document.getElementById("fileGrid");
-  const mergeBtn   = document.getElementById("mergeBtn");
-  const actions    = document.getElementById("actions");
-  const statusEl   = document.getElementById("status");
-  const resultBox  = document.getElementById("result");
+  const dropzone     = document.getElementById("dropzone");
+  const fileInput    = document.getElementById("fileInput");
+  const clearAllBtn  = document.getElementById("clearAllBtn");
+  const countBadge   = document.getElementById("countBadge");
+  const toolbar      = document.getElementById("toolbar");
+  const fileGrid     = document.getElementById("fileGrid");
+  const mergeBtn     = document.getElementById("mergeBtn");
+  const actions      = document.getElementById("actions");
+  const statusEl     = document.getElementById("status");
+  const resultBox    = document.getElementById("result");
   const downloadLink = document.getElementById("downloadLink");
-  const startOverBtn  = document.getElementById("startOver");
+  const startOverBtn = document.getElementById("startOver");
 
   let items = [];
   let sortable = null;
@@ -157,7 +158,11 @@
   clearAllBtn.addEventListener("click", resetUI);
 
   fileInput.addEventListener("change", async (e)=>{
-    const list = Array.from(e.target.files || []).filter(isPdf);
+    const original = Array.from(e.target.files || []);
+    const list = original.filter(isPdf);
+    const skipped = original.length - list.length;
+    if (skipped > 0) toast.error("Only PDFs are supported. Files skipped.", { title: "Invalid file(s)" });
+
     if (list.length) await addFiles(list);
     e.target.value = "";
   });
@@ -176,7 +181,11 @@
     });
   });
   dropzone.addEventListener("drop", async (e)=>{
-    const files = Array.from(e.dataTransfer?.files || []).filter(isPdf);
+    const original = Array.from(e.dataTransfer?.files || []);
+    const files = original.filter(isPdf);
+    const skipped = original.length - files.length;
+    if (skipped > 0) toast.error("Only PDFs are supported. Files skipped.", { title: "Invalid file(s)" });
+
     if (files.length) await addFiles(files);
   });
 
@@ -186,7 +195,7 @@
 
     const room = MAX_FILES - items.length;
     if (newFiles.length > room){
-      alert(`You can add ${room} more file(s). Max is ${MAX_FILES}.`);
+      toast.error(`You can add ${room} more file(s). Max is ${MAX_FILES}.`);
       newFiles = newFiles.slice(0, room);
     }
 
@@ -242,6 +251,7 @@
         fallback.textContent = "Preview unavailable";
         thumb.appendChild(fallback);
         meta.textContent = `${(file.size/1024/1024).toFixed(2)} MB`;
+        toast.error(`Couldn't render a preview for ${file.name}.`);
       }
       info.appendChild(name); info.appendChild(meta);
 
@@ -270,7 +280,8 @@
 
     if (!sortable){
       sortable = new Sortable(fileGrid, {
-        animation:150, ghostClass:"drag-ghost", dragClass:"dragging", handle:".file-thumb", onEnd: () => updatePositions()
+        animation:150, ghostClass:"drag-ghost", dragClass:"dragging", handle:".file-thumb",
+        onEnd: () => updatePositions()
       });
     }
     updateCount();
@@ -278,7 +289,10 @@
   }
 
   document.getElementById("mergeBtn").addEventListener("click", ()=>{
-    if (items.length < 2){ alert("Add at least two PDFs to merge."); return; }
+    if (items.length < 2){
+      toast.error("Add at least two PDFs to merge.", { title: "Nothing to merge" });
+      return;
+    }
 
     const idsInDom = Array.from(document.querySelectorAll(".file-card")).map(c => c.getAttribute("data-id"));
     const order = idsInDom.map(id => items.findIndex(it => it.id === id));
@@ -317,7 +331,7 @@
     };
     xhr.onerror = ()=>{
       mergeBtn.disabled = false;
-      alert("Network error during merge.");
+      toast.error("Network error. Please try again.");
     };
     xhr.onload = ()=>{
       mergeBtn.disabled = false;
@@ -326,7 +340,7 @@
 
       if (xhr.status !== 200){
         const r = new FileReader();
-        r.onload = ()=> alert(r.result || "Merge failed");
+        r.onload = ()=> toast.error(String(r.result || "Merge failed"));
         r.readAsText(xhr.response);
         return;
       }
@@ -350,6 +364,8 @@
       document.querySelector(".panel").classList.add("center");
       statusEl.textContent = "";
       resultBox.scrollIntoView({ behavior:"smooth", block:"start" });
+
+      toast.success("PDF ready. Click Download.");
     };
 
     xhr.send(fd);

@@ -9,6 +9,62 @@
   <link rel="icon" href="{{ url_for('static', filename='img/logo.svg') }}" type="image/svg+xml">
 
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <style>
+    .toast-stack{
+      position: fixed;
+      inset: auto 16px 16px auto;
+      display: grid;
+      gap: 10px;
+      z-index: 9999;
+      pointer-events: none;
+      max-width: 420px;
+    }
+
+    @media (min-width: 640px){
+      .toast-stack{ inset: auto 24px 24px auto; }
+    }
+
+    .toast{
+      display:flex; align-items:center; gap:12px;
+      padding:12px 14px; border-radius:14px;
+      background:#10161f; border:1px solid var(--border);
+      box-shadow: var(--shadow);
+      pointer-events:auto;
+      animation: toast-in .18s ease-out;
+    }
+    @keyframes toast-in{ from{ transform:translateY(4px); opacity:.0 } to{ transform:none; opacity:1 } }
+
+    .toast .toast-content{ display:grid; gap:2px }
+    .toast .toast-title{ font-weight:700; }
+    .toast .toast-msg{ color: var(--muted); }
+
+    .toast-icon{
+      width:26px; height:26px; display:grid; place-items:center;
+      border-radius:999px; border:1px solid var(--border);
+      background:#0b1118;
+    }
+    .toast-icon svg{ width:16px; height:16px; display:block; }
+
+    .toast-close{
+      margin-left:auto;
+      background:transparent; border:1px solid var(--border);
+      color:var(--muted); border-radius:10px; padding:4px 8px; cursor:pointer;
+    }
+    .toast-close:hover{ color:var(--text); }
+
+    .toast.is-error{ border-color: rgba(255,107,107,.5); box-shadow: 0 8px 24px rgba(255,107,107,.15); }
+    .toast.is-error .toast-icon{ background: rgba(255,107,107,.10); border-color: rgba(255,107,107,.4); color:#ffb6b6; }
+
+    .toast.is-success{ border-color: rgba(66,201,122,.5); box-shadow: 0 8px 24px rgba(66,201,122,.15); }
+    .toast.is-success .toast-icon{ background: rgba(66,201,122,.10); border-color: rgba(66,201,122,.4); color:#a8f2c8; }
+
+    .toast.is-info{ border-color: rgba(79,140,255,.5); box-shadow: 0 8px 24px rgba(79,140,255,.15); }
+    .toast.is-info .toast-icon{ background: rgba(79,140,255,.10); border-color: rgba(79,140,255,.4); color:#b9d3ff; }
+
+    .toast.is-warn{ border-color: rgba(255,193,7,.5); box-shadow: 0 8px 24px rgba(255,193,7,.15); }
+    .toast.is-warn .toast-icon{ background: rgba(255,193,7,.10); border-color: rgba(255,193,7,.4); color:#ffe28a; }
+  </style>
   {% block head_extra %}{% endblock %}
 </head>
 <body>
@@ -17,7 +73,12 @@
       <img src="{{ url_for('static', filename='img/logo.svg') }}" class="logo" alt="PDF Tools logo">
       <span class="brand-text"><span class="pdf">PDF</span> <span class="tools">Tools</span></span>
     </a>
-    <nav class="nav">
+
+    <button class="nav-toggle" aria-expanded="false" aria-controls="mainNav" aria-label="Toggle menu">
+      <span class="bar"></span><span class="bar"></span><span class="bar"></span>
+    </button>
+
+    <nav class="nav" id="mainNav">
       <a href="{{ url_for('home') }}" class="nav-link {% if request.endpoint == 'home' %}active{% endif %}">Home</a>
       <a href="{{ url_for('convert.convert_page') }}" class="nav-link {% if request.endpoint == 'convert.convert_page' %}active{% endif %}">Convert</a>
       <a href="{{ url_for('merge.merge_page') }}" class="nav-link {% if request.endpoint == 'merge.merge_page' %}active{% endif %}">Merge</a>
@@ -35,6 +96,80 @@
     </div>
   </footer>
 
+  <div id="toast-root" class="toast-stack" aria-live="polite" aria-atomic="true"></div>
+
+  <script>
+    (function () {
+      const root = document.getElementById('toast-root');
+
+      const ICONS = {
+        success:
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
+        error:
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"/></svg>',
+        info:
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 8h.01M11 12h2v4h-2z"/></svg>',
+        warn:
+          '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg>'
+      };
+
+      function push(kind, message, opts = {}) {
+        const t = document.createElement('div');
+        t.className = `toast is-${kind}`;
+        t.setAttribute('role', 'alert');
+        t.innerHTML = `
+          <span class="toast-icon" aria-hidden="true">${ICONS[kind] || ICONS.info}</span>
+          <div class="toast-content">
+            ${opts.title ? `<div class="toast-title">${opts.title}</div>` : ""}
+            <div class="toast-msg">${message}</div>
+          </div>
+          <button class="toast-close" aria-label="Dismiss">×</button>
+        `;
+        root.appendChild(t);
+
+        const remove = () => { t.style.opacity = '0'; setTimeout(() => t.remove(), 180); };
+        t.querySelector('.toast-close').addEventListener('click', remove);
+        setTimeout(remove, opts.duration ?? 4000);
+      }
+
+      window.toast = {
+        success: (m, o) => push('success', m, o),
+        error:   (m, o) => push('error',   m, o),
+        info:    (m, o) => push('info',    m, o),
+        warn:    (m, o) => push('warn',    m, o),
+      };
+    })();
+  </script>
+
   {% block scripts %}{% endblock %}
+
+  <script>
+    (function () {
+      const header = document.querySelector('.app-header');
+      const nav = document.getElementById('mainNav');
+      const btn = document.querySelector('.nav-toggle');
+
+      function placeNav() {
+        const h = Math.round(header.getBoundingClientRect().height);
+        nav.style.top = h + 'px';
+      }
+      placeNav();
+      window.addEventListener('resize', placeNav);
+
+      btn.addEventListener('click', () => {
+        const open = nav.classList.toggle('open');
+        btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        document.body.classList.toggle('menu-open', open);
+      });
+
+      nav.querySelectorAll('a').forEach(a =>
+        a.addEventListener('click', () => {
+          nav.classList.remove('open');
+          btn.setAttribute('aria-expanded', 'false');
+          document.body.classList.remove('menu-open');
+        })
+      );
+    })();
+  </script>
 </body>
 </html>
